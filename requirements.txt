@@ -1,0 +1,53 @@
+# Technical Test #1 — Build a Secure Webhook & Withdrawal Service
+
+**Task Duration:** 1–2 days max
+
+**Format:** Self-contained NestJS project (you build from scratch)
+
+This test is issued only after the Qualification Questions round has been passed. It is the single highest-signal step in our interview process and anchors Rounds 2 and 3 of the live interview loop.
+
+---
+
+### The Brief
+
+Build a small NestJS service that simulates a critical slice of a real-money platform. The service has two responsibilities:
+
+**Part A — Webhook Receiver**
+
+Implement an endpoint `POST /webhooks/deposit` that accepts deposit notifications from a (fake) third-party payment provider. The request has:
+
+- A JSON body with `{ userId, amount, currency, transactionId, timestamp }`
+- An `X-Signature` header containing an HMAC-SHA256 of the raw body computed with a shared secret
+- An `X-Timestamp` header with the Unix timestamp of when the webhook was sent
+
+On valid webhook receipt, increment the user's balance in your database. On invalid webhook, reject it appropriately.
+
+**Part B — Withdrawal Endpoint**
+
+Implement an authenticated endpoint `POST /withdrawals` that lets a user request a withdrawal. The request body has `{ amount, currency, destinationAddress }`. The user is identified by a JWT in the `Authorization` header.
+
+On successful withdrawal request:
+
+- Validate the user has sufficient balance
+- Deduct the amount from their balance
+- Create a pending withdrawal record
+- Return the withdrawal ID
+
+**Supporting requirements:**
+
+- A way to create users with an initial balance (any approach — seed script, admin endpoint, test setup)
+- A way to issue JWTs to those users for testing
+- A `GET /users/me/balance` endpoint returning the current authenticated user's balance
+
+---
+
+### Technical Constraints
+
+- **Framework:** NestJS (latest stable, 10 or 11)
+- **Language:** TypeScript (strict mode)
+- **Database:** PostgreSQL via Prisma. (If you genuinely don't know Prisma, TypeORM is acceptable but please note this in your README.)
+- **Validation:** class-validator + ValidationPipe
+- **Tests:** Jest. Write tests for the security-critical paths.
+- **Setup:** Project must run with `docker compose up` or equivalent — we should be able to clone, run one command, and have a working service.
+
+You will be assessed on the security choices you made, the failure modes you considered, the tests you wrote, and the clarity of your README.

@@ -1,0 +1,83 @@
+// Prisma schema for the Secure Webhook & Withdrawal Service.
+//
+// Design notes (security-relevant):
+//  - All monetary values use `Decimal` (NUMERIC in Postgres), never floats.
+//    Floating point cannot represent money exactly and would leak/round value.
+//  - Balances are modelled per (user, currency) so a USD deposit can never be
+//    spent as BTC, and currency mismatches are structurally impossible.
+//  - `Deposit.transactionId` is globally unique. This is the real replay /
+//    double-credit defense: a provider retry (or an attacker replaying a
+//    captured-but-valid webhook) hits the unique constraint and is ignored.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  balances    Balance[]
+  deposits    Deposit[]
+  withdrawals Withdrawal[]
+}
+
+model Balance {
+  id       String  @id @default(uuid())
+  userId   String
+  currency String
+  // Precise decimal money. 30 digits total, 8 after the point (covers fiat
+  // cents and 8-decimal crypto like BTC). Constrained >= 0 at the app layer
+  // via atomic conditional updates.
+  amount   Decimal @default(0) @db.Decimal(30, 8)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One balance row per currency per user.
+  @@unique([userId, currency])
+  @@index([userId])
+}
+
+model Deposit {
+  id            String   @id @default(uuid())
+  // Idempotency key from the payment provider. Unique => at-most-once credit.
+  transactionId String   @unique
+  userId        String
+  amount        Decimal  @db.Decimal(30, 8)
+  currency      String
+  // Provider-supplied timestamp from the webhook body (audit trail).
+  providerTimestamp DateTime
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum WithdrawalStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model Withdrawal {
+  id                 String           @id @default(uuid())
+  userId             String
+  amount             Decimal          @db.Decimal(30, 8)
+  currency           String
+  destinationAddress String
+  status             WithdrawalStatus @default(PENDING)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
