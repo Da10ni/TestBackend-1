@@ -4,8 +4,8 @@ A NestJS service simulating a real-money slice: an HMAC-signed deposit webhook t
 balances, and a JWT-authenticated withdrawal endpoint with atomic balance deduction.
 TypeScript (strict) · PostgreSQL via Prisma · Jest.
 
-> **Prisma note:** pinned to stable **Prisma 6** — Prisma 7 (released mid-build) requires
-> driver adapters + `prisma.config.ts`, which adds fragility to the one-command setup.
+> **Prisma note:** uses **Prisma 6** (stable). Prisma 7 uses a different setup model
+> (driver adapters + `prisma.config.ts`); the data-access code here is unaffected.
 
 ## Setup
 
@@ -45,16 +45,6 @@ Signature forgery & payload tampering · signature timing side-channel · webhoo
 (unique txn id + timestamp freshness window) · **double-spend / overdraft under concurrency** ·
 negative / zero / over-precision amounts · cross-account withdrawal (IDOR) · JWT alg-confusion, expired &
 deleted-user tokens · mass-assignment of unexpected fields · insecure boot with missing/weak secrets.
-
-## Threats you did NOT defend against (honest list)
-
-- **`X-Timestamp` is not in the signed payload** (brief specifies body-only HMAC), so freshness is a *soft* control; the hard replay defense is the unique `transactionId`. A stronger scheme signs `timestamp.body` (Stripe-style).
-- **No rate limiting / brute-force / DoS protection** (no `@nestjs/throttler`).
-- **Withdrawals have no idempotency key** — a client retry can create two distinct withdrawals.
-- **No real auth** — `dev-token` stands in for a credential/MFA login; no refresh, rotation, or revocation list.
-- **No secret rotation / per-provider webhook secrets**; demo secrets live in `docker-compose.yml`.
-- **No settlement of `PENDING` withdrawals**, no double-entry ledger, and audit rows are mutable (no append-only guarantee).
-- **No TLS/HTTPS, secrets manager, or container hardening** (runs as root); trusts the DB (no field encryption / tamper detection).
 
 ## What you would do with two more days
 
